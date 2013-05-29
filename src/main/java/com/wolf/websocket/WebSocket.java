@@ -1,6 +1,5 @@
 package com.wolf.websocket;
 
-import com.wolf.websocket.frame.Frame;
 import java.nio.channels.NotYetConnectedException;
 
 public interface WebSocket {
