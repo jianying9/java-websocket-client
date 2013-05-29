@@ -39,12 +39,47 @@ public class WebSocketJUnitTest {
     }
     //
 
-    @Test
+//    @Test
     public void test() throws InterruptedException, IOException {
-        WebSocketImpl.DEBUG = true;
-        String serverlocation = "ws://192.168.19.219:5880/search-server/socket.io";
+        int time = 100;
+        String serverlocation = "ws://192.168.64.50:8080/test-server/socket.io";
         URI uri = URI.create(serverlocation);
         TestWebSocketClient client = new TestWebSocketClient(uri);
-        client.send("{\"act\":\"INQUIRE_SEARCH_TASK\",\"pageSize\":\"10\"}");
+        System.out.println("1--------------------");
+        client.send("{\"act\":\"GET_TIME\"}");
+        Thread.sleep(time);
+        System.out.println("2--------------------");
+        client.send("{\"act\":\"GET_TIME\"}");
+        Thread.sleep(time);
+        System.out.println("3----------------------");
+        client.send("{\"act\":\"LOGIN\"}");
+        Thread.sleep(time);
+        System.out.println("4------------------------");
+        client.send("{\"act\":\"GET_TIME\"}");
+        Thread.sleep(time);
+        System.out.println("5--------------------");
+        client.send("{\"act\":\"GET_TIME\"}");
+        Thread.sleep(time);
+        System.out.println("6--------------------");
+        client.close();
+        Thread.sleep(5000);
+    }
+    
+    @Test
+    public void test123() throws InterruptedException, IOException {
+        Thread.currentThread().setName("mainThread");
+        String serverlocation = "ws://192.168.64.50:8080/test-server/socket.io";
+        URI uri = URI.create(serverlocation);
+        TestWebSocketClient client = new TestWebSocketClient(uri);
+        client.send("{\"act\":\"LOGIN\"}");
+//        client.send("{\"act\":\"GET_TIME\"}");
+        int i = 0;
+        while(i < 10) {
+            System.out.println(i + "---------------------------");
+            client.send("{\"act\":\"GET_TIME\",\"num\":\"" + i + "\"}");
+            i++;
+        }
+        Thread.sleep(5000);
+        client.close();
     }
 }

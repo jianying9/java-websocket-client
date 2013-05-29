@@ -1,7 +1,6 @@
 package com.wolf.websocket;
 
 import com.wolf.websocket.frame.Frame;
-import java.nio.ByteBuffer;
 import java.nio.channels.NotYetConnectedException;
 
 public interface WebSocket {
@@ -38,10 +37,6 @@ public interface WebSocket {
      * @throws NotYetConnectedException
      */
     public void connect();
-
-    public void sendFrame(Frame framedata);
-
-    public boolean hasBufferedData();
 
     public boolean isConnecting();
 

@@ -4,7 +4,6 @@ import com.wolf.websocket.WebSocket;
 import com.wolf.websocket.WebSocketImpl;
 import com.wolf.websocket.WebSocketListener;
 import java.net.URI;
-import java.nio.channels.NotYetConnectedException;
 
 /**
  * The <tt>WebSocketClient</tt> is an abstract class that expects a valid
@@ -55,12 +54,11 @@ public abstract class WebSocketClient implements WebSocketListener {
      *
      * @param text The String to send to the WebSocket server.
      */
-    public void send(String text) throws NotYetConnectedException {
-        synchronized (this) {
-            if (this.webSocket.isOpen() == false) {
-                this.webSocket.connect();
-            }
-        }
+    public final void send(String text) {
         this.webSocket.send(text);
+    }
+    
+    public final void close() {
+        this.webSocket.close();
     }
 }

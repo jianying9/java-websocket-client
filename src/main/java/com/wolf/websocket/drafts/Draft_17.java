@@ -4,11 +4,10 @@ import com.wolf.websocket.exceptions.InvalidDataException;
 import com.wolf.websocket.exceptions.InvalidFrameException;
 import com.wolf.websocket.exceptions.InvalidHandshakeException;
 import com.wolf.websocket.exceptions.LimitExedeedException;
-import com.wolf.websocket.exceptions.NotSendableException;
 import com.wolf.websocket.frame.CloseFrameImpl;
-import com.wolf.websocket.frame.FrameData;
 import com.wolf.websocket.frame.Frame;
 import com.wolf.websocket.frame.Frame.Opcode;
+import com.wolf.websocket.frame.FrameData;
 import com.wolf.websocket.frame.FrameDataImpl;
 import com.wolf.websocket.handshake.ClientHandshake;
 import com.wolf.websocket.handshake.ServerHandshake;
@@ -96,16 +95,16 @@ public class Draft_17 extends Draft {
     }
 
     @Override
-    public List<Frame> createFrames(String text) {
+    public Frame createFrames(String text) {
         FrameData curframe = new FrameDataImpl();
         try {
             curframe.setPayload(ByteBuffer.wrap(Charsetfunctions.utf8Bytes(text)));
         } catch (InvalidDataException e) {
-            throw new NotSendableException(e);
+            throw new RuntimeException(e);
         }
         curframe.setFin(true);
         curframe.setOptcode(Opcode.TEXT);
-        return Collections.singletonList((Frame) curframe);
+        return curframe;
     }
 
     private byte fromOpcode(Opcode opcode) {

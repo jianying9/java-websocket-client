@@ -94,7 +94,7 @@ public abstract class Draft {
 
     public abstract ByteBuffer createBinaryFrame(Frame framedata); // TODO Allow to send data on the base of an Iterator or InputStream
 
-    public abstract List<Frame> createFrames(String text);
+    public abstract Frame createFrames(String text);
 
     public abstract void reset();
 

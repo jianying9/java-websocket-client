@@ -1,6 +1,7 @@
 package com.wolf.websocket;
 
 import com.wolf.websocket.client.WebSocketClient;
+import com.wolf.websocket.logger.Log;
 import java.net.URI;
 
 /**
@@ -15,12 +16,11 @@ public class TestWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen() {
-        System.out.println("TestWebSocketClient: on open");
+        Log.LOG.debug("TestWebSocketClient: on open");
     }
 
     @Override
     public void onMessage(String message) {
-        System.out.println(message);
     }
 
     @Override
@@ -28,6 +28,6 @@ public class TestWebSocketClient extends WebSocketClient {
     }
 
     public void onClose() {
-        System.out.println("TestWebSocketClient: on close");
+        Log.LOG.debug("TestWebSocketClient: on close");
     }
 }
