@@ -1,204 +1,111 @@
 package com.wolf.websocket;
 
 import com.wolf.websocket.drafts.Draft;
-import com.wolf.websocket.drafts.Draft.HandshakeState;
-import com.wolf.websocket.drafts.Draft_17;
-import com.wolf.websocket.exceptions.InvalidDataException;
-import com.wolf.websocket.frame.Frame;
-import com.wolf.websocket.frame.Frame.Opcode;
+import com.wolf.websocket.drafts.Draft17Impl;
 import com.wolf.websocket.handshake.ClientHandshake;
-import com.wolf.websocket.handshake.ClientHandshakeImpl;
 import com.wolf.websocket.handshake.ServerHandshake;
-import com.wolf.websocket.logger.Log;
-import com.wolf.websocket.util.Charsetfunctions;
+import com.wolf.websocket.message.Message;
+import com.wolf.websocket.message.MessageImpl;
+import com.wolf.websocket.message.OpCode;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Represents one end (client or server) of a single WebSocketImpl connection.
- * Takes care of the "handshake" phase, then allows for easy sending of text
- * frames, and receiving frames through an event-based model.
  *
+ * @author aladdin
  */
 public class WebSocketImpl implements WebSocket {
 
-    public static int RCVBUF = 16384;
-    /**
-     * the possibly wrapped channel object whose selection is controlled by
-     * {@link #key}
-     */
     public SocketChannel channel;
-    /**
-     * Queue of buffers that need to be sent to the client.
-     */
     private final BlockingQueue<String> sendMessageQueue;
-    /**
-     * When true no further frames may be submitted to be sent
-     */
-    private volatile READYSTATE readystate = READYSTATE.NOT_YET_CONNECTED;
-    /**
-     * The listener to notify of WebSocket events.
-     */
-    private final WebSocketListener wsl;
-    private final Draft draft = new Draft_17();
-    private final String ip;
-    private final int port;
-    private final String path;
-    private volatile Thread writeThread;
+    private final BlockingQueue<Message> receiveMessageQueue;
+    private volatile ReadyStateEnum readystate = ReadyStateEnum.NOT_YET_CONNECTED;
+    private final WebSocketListener webSocketListener;
+    private final Draft draft = new Draft17Impl();
+    private final URI uri;
+    private volatile Thread sendThread = null;
+    private volatile Thread receiveThread = null;
+    private volatile Thread channelThread = null;
 
-    /**
-     * crates a websocket with client role
-     *
-     * @param socket may be unbound
-     */
-    public WebSocketImpl(String ip, int port, String path, WebSocketListener listener) {
+    public WebSocketImpl(WebSocketListener webSocketListener, String serverUrl) {
+        this.webSocketListener = webSocketListener;
+        this.uri = URI.create(serverUrl);
         this.sendMessageQueue = new LinkedBlockingQueue<String>(50);
-        this.wsl = listener;
-        this.ip = ip;
-        this.port = port;
-        this.path = path;
-        //
-        this.writeThread = new Thread(new WebsocketWriteThread(this));
-        this.writeThread.start();
+        this.receiveMessageQueue = new LinkedBlockingQueue<Message>(50);
     }
 
-    /**
-     *
-     */
-    public void decode(ByteBuffer socketBuffer) {
-        if (socketBuffer.hasRemaining() == false) {
-            return;
+    @Override
+    public synchronized void start() {
+        if (this.sendThread == null) {
+            this.sendThread = new Thread(new WebSocketSendThread(this), "webSocketSendThread");
+            this.sendThread.start();
         }
-        String text = "process(" + socketBuffer.remaining() + "): {" + new String(socketBuffer.array(), socketBuffer.position(), socketBuffer.remaining()) + "}";
-        Log.LOG.debug(text);
-        this.decodeFrames(socketBuffer);
-    }
-
-    /**
-     * Returns whether the handshake phase has is completed. In case of a broken
-     * handshake this will be never the case.
-     *
-     */
-    private boolean decodeHandshake(ClientHandshake request, ByteBuffer socketBufferNew) {
-        ServerHandshake response = draft.translateHandshake(socketBufferNew);
-        HandshakeState handshakestate = draft.acceptHandshakeAsClient(request, response);
-        return handshakestate == HandshakeState.MATCHED;
-    }
-
-    private void decodeFrames(ByteBuffer socketBuffer) {
-        List<Frame> frames;
-        try {
-            frames = draft.translateFrame(socketBuffer);
-            for (Frame f : frames) {
-                Opcode curop = f.getOpcode();
-                switch (curop) {
-                    case CLOSING:
-                        this.close();
-                        break;
-                    case TEXT:
-                        this.message(Charsetfunctions.stringUtf8(f.getPayloadData()));
-                        break;
-                }
-            }
-        } catch (InvalidDataException e1) {
-            throw new RuntimeException(e1);
+        if (this.receiveThread == null) {
+            this.receiveThread = new Thread(new WebSocketReceiveThread(this), "webSocketReceiveThread");
+            this.receiveThread.start();
         }
-    }
-
-    /**
-     * Send Text data to the other end.
-     *
-     * @throws IllegalArgumentException
-     * @throws NotYetConnectedException
-     */
-    @Override
-    public void send(String text) {
-        if (this.sendMessageQueue.size() < 20) {
-            this.sendMessageQueue.add(text);
-        } else {
-            this.wsl.onMessage("{\"flag\":\"BUSY\"}");
-        }
-    }
-
-    private void open() {
-        this.readystate = READYSTATE.OPEN;
-        this.wsl.onOpen();
-    }
-
-    private void message(String message) {
-        Log.LOG.debug("on message:" + message);
-        this.wsl.onMessage(message);
-    }
-
-    @Override
-    public boolean isConnecting() {
-        return readystate == READYSTATE.CONNECTING; // ifflushandclosestate
-    }
-
-    @Override
-    public boolean isOpen() {
-        return readystate == READYSTATE.OPEN;
-    }
-
-    @Override
-    public boolean isClosing() {
-        return readystate == READYSTATE.CLOSING;
-    }
-
-    @Override
-    public boolean isClosed() {
-        return readystate == READYSTATE.CLOSED;
     }
 
     @Override
     public synchronized void close() {
-        if (readystate != READYSTATE.CLOSING || readystate != READYSTATE.CLOSED) {
-            this.readystate = READYSTATE.CLOSING;
+        if (readystate != ReadyStateEnum.CLOSING || readystate != ReadyStateEnum.CLOSED) {
+            this.readystate = ReadyStateEnum.CLOSING;
             try {
                 this.channel.close();
             } catch (IOException ex) {
+                ex.printStackTrace();
             }
-            this.readystate = READYSTATE.CLOSED;
+            this.readystate = ReadyStateEnum.CLOSED;
+        }
+    }
+
+    @Override
+    public void send(String message) {
+        try {
+            this.sendMessageQueue.put(message);
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
         }
     }
 
     @Override
     public void connect() {
-        String host = this.ip + (port != WebSocket.DEFAULT_PORT ? ":" + port : "");
-        ClientHandshakeImpl handshake = new ClientHandshakeImpl();
-        handshake.setResourceDescriptor(path);
-        handshake.put("Host", host);
-        ClientHandshake handshakerequest = draft.postProcessHandshakeRequestAsClient(handshake);
-        ByteBuffer byteBuffer = this.draft.createHandshake(handshakerequest);
-        ByteBuffer buff = ByteBuffer.allocate(WebSocketImpl.RCVBUF);
+        ClientHandshake clientHandshake = this.draft.createClientHandshake(this.uri);
+        ByteBuffer clientHandshakeByteBuffer = this.draft.createClientHandshakeByteBuffer(clientHandshake);
+        ByteBuffer buff = ByteBuffer.allocate(WebSocket.RCV_BUF_SIZE);
         try {
             this.channel = SelectorProvider.provider().openSocketChannel();
             this.channel.configureBlocking(true);
-            this.channel.connect(new InetSocketAddress(this.ip, this.port));
-            this.readystate = READYSTATE.CONNECTING;
-            this.channel.write(byteBuffer);
+            int port = this.uri.getPort();
+            if (port == -1) {
+                port = WebSocket.DEFAULT_PORT;
+            }
+            this.channel.connect(new InetSocketAddress(this.uri.getHost(), port));
+            this.readystate = ReadyStateEnum.CONNECTING;
+            this.channel.write(clientHandshakeByteBuffer);
             int read;
             boolean result;
+            ServerHandshake serverHandshake;
             while (this.channel.isOpen()) {
                 buff.clear();
                 read = this.channel.read(buff);
                 buff.flip();
                 if (read > 0) {
-                    result = this.decodeHandshake(handshakerequest, buff);
+                    serverHandshake = this.draft.parseServerHandshake(buff);
+                    result = this.draft.validate(clientHandshake, serverHandshake);
                     if (result) {
-                        this.open();
-                        WebsocketReadThread websocketReadThread = new WebsocketReadThread(this);
-                        Thread readThread = new Thread(websocketReadThread);
-                        readThread.start();
-                        websocketReadThread.connectLatch.await();
+                        this.readystate = ReadyStateEnum.OPEN;
+                        if (this.channelThread == null) {
+                            this.channelThread = new Thread(new WebSocketIOThread(this), "webSocketIOThread");
+                            this.channelThread.start();
+                        }
                         break;
                     } else {
                         throw new RuntimeException("connect handshake error");
@@ -207,80 +114,126 @@ public class WebSocketImpl implements WebSocket {
             }
         } catch (IOException ex) {
             throw new RuntimeException(ex);
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
         }
     }
 
-    private final class WebsocketWriteThread implements Runnable {
+    @Override
+    public boolean isConnecting() {
+        return this.readystate == ReadyStateEnum.CONNECTING;
+    }
+
+    @Override
+    public boolean isOpen() {
+        return this.readystate == ReadyStateEnum.OPEN;
+    }
+
+    @Override
+    public boolean isClosing() {
+        return this.readystate == ReadyStateEnum.CLOSING;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return this.readystate == ReadyStateEnum.CLOSED;
+    }
+
+    private final class WebSocketSendThread implements Runnable {
 
         private final WebSocketImpl webSocket;
 
-        public WebsocketWriteThread(WebSocketImpl webSocket) {
+        public WebSocketSendThread(WebSocketImpl webSocket) {
             this.webSocket = webSocket;
         }
 
         @Override
         public void run() {
-            Thread.currentThread().setName("writeThread");
-            Log.LOG.debug("start....");
-            String text;
+            String message;
             ByteBuffer buf;
-            Frame frame;
+            Message mes;
             try {
                 while (Thread.interrupted() == false) {
-                    text = this.webSocket.sendMessageQueue.take();
-                    Log.LOG.debug("send message：" + text);
-                    frame = this.webSocket.draft.createFrames(text);
-                    buf = this.webSocket.draft.createBinaryFrame(frame);
+                    message = this.webSocket.sendMessageQueue.take();
+                    mes = new MessageImpl(OpCode.TEXT, message);
+                    buf = this.webSocket.draft.createFrame(mes);
                     synchronized (this.webSocket) {
-                        Log.LOG.debug("assert connect...");
-                        if (this.webSocket.readystate != READYSTATE.OPEN) {
-                            Log.LOG.debug("connect...");
+                        if (this.webSocket.readystate != ReadyStateEnum.OPEN) {
                             this.webSocket.connect();
                         }
                     }
-                    Log.LOG.debug("write..........");
                     while (buf.hasRemaining()) {
                         this.webSocket.channel.write(buf);
                     }
                 }
             } catch (IOException e) {
+                e.printStackTrace();
                 this.webSocket.close();
             } catch (InterruptedException e) {
+                e.printStackTrace();
+                this.webSocket.sendThread = null;
             }
         }
     }
 
-    private final class WebsocketReadThread implements Runnable {
+    private final class WebSocketReceiveThread implements Runnable {
 
         private final WebSocketImpl webSocket;
-        private final CountDownLatch connectLatch = new CountDownLatch(1);
 
-        public WebsocketReadThread(WebSocketImpl webSocket) {
+        public WebSocketReceiveThread(WebSocketImpl webSocket) {
             this.webSocket = webSocket;
         }
 
         @Override
         public void run() {
-            Thread.currentThread().setName("readThread");
-            Log.LOG.debug("start....");
-            this.connectLatch.countDown();
-            ByteBuffer buff = ByteBuffer.allocate(WebSocketImpl.RCVBUF);
-            int read;
+            Message message;
             try {
-                while (this.webSocket.readystate == READYSTATE.OPEN) {
+                while (Thread.interrupted() == false) {
+                    message = this.webSocket.receiveMessageQueue.take();
+                    if (message.getOpCode() == OpCode.CLOSING) {
+                        this.webSocket.close();
+                    } else {
+                        this.webSocket.webSocketListener.onMessage(message.getUTF8Data());
+                    }
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                this.webSocket.receiveThread = null;
+            }
+        }
+    }
+
+    private final class WebSocketIOThread implements Runnable {
+
+        private final WebSocketImpl webSocket;
+
+        public WebSocketIOThread(WebSocketImpl webSocket) {
+            this.webSocket = webSocket;
+        }
+
+        @Override
+        public void run() {
+            ByteBuffer buff = ByteBuffer.allocate(WebSocket.RCV_BUF_SIZE);
+            int read;
+            List<Message> serverMessageList;
+            try {
+                while (Thread.interrupted() == false && this.webSocket.channel.isOpen()) {
                     buff.clear();
                     read = this.webSocket.channel.read(buff);
                     buff.flip();
-                    Log.LOG.debug("read message...." + read);
                     if (read > 0) {
-                        this.webSocket.decode(buff);
+                        serverMessageList = this.webSocket.draft.parseFrame(buff);
+                        if (serverMessageList.isEmpty() == false) {
+                            for (Message message : serverMessageList) {
+                                this.webSocket.receiveMessageQueue.put(message);
+                                
+                            }
+                        }
                     }
                 }
             } catch (IOException e) {
-            } finally {
-                this.webSocket.draft.reset();
+                e.printStackTrace();
+                this.webSocket.close();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
             }
         }
     }

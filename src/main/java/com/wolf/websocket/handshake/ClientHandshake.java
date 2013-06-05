@@ -1,8 +1,16 @@
 package com.wolf.websocket.handshake;
 
-public interface ClientHandshake extends Handshakedata {
+import java.util.Map;
 
-    public String getResourceDescriptor();
-    
-    public void setResourceDescriptor(String resourcedescriptor);
+/**
+ *
+ * @author aladdin
+ */
+public interface ClientHandshake {
+
+    public String getPath();
+
+    public Map<String, String> getHttpFieldMap();
+
+    public String getHttpFieldValue(String fieldName);
 }

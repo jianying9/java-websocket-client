@@ -1,12 +1,18 @@
 package com.wolf.websocket.handshake;
 
-public interface ServerHandshake extends Handshakedata {
+import java.util.Map;
 
-    public short getHttpStatus();
-
-    public String getHttpStatusMessage();
+/**
+ *
+ * @author aladdin
+ */
+public interface ServerHandshake {
     
-    public void setHttpStatus(short status);
-
-    public void setHttpStatusMessage(String message);
+    public int getHttpState();
+    
+    public String getHttpMessage();
+    
+    public Map<String, String> getHttpFieldMap();
+    
+    public String getHttpFieldValue(String fieldName);
 }

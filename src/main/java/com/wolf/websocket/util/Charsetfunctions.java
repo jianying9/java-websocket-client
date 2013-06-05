@@ -1,7 +1,5 @@
 package com.wolf.websocket.util;
 
-import com.wolf.websocket.exceptions.InvalidDataException;
-import com.wolf.websocket.frame.CloseFrame;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -10,7 +8,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 
 public class Charsetfunctions {
-    
+
     public static CodingErrorAction codingErrorAction = CodingErrorAction.REPORT;
 
     /*
@@ -34,11 +32,11 @@ public class Charsetfunctions {
             throw new RuntimeException(e);
         }
     }
-    
+
     public static String stringAscii(byte[] bytes) {
         return stringAscii(bytes, 0, bytes.length);
     }
-    
+
     public static String stringAscii(byte[] bytes, int offset, int length) {
         try {
             return new String(bytes, offset, length, "ASCII");
@@ -46,8 +44,8 @@ public class Charsetfunctions {
             throw new RuntimeException(e);
         }
     }
-    
-    public static String stringUtf8(byte[] bytes) throws InvalidDataException {
+
+    public static String stringUtf8(byte[] bytes) {
         return stringUtf8(ByteBuffer.wrap(bytes));
     }
 
@@ -64,7 +62,7 @@ public class Charsetfunctions {
      }
      return s;
      }*/
-    public static String stringUtf8(ByteBuffer bytes) throws InvalidDataException {
+    public static String stringUtf8(ByteBuffer bytes) {
         CharsetDecoder decode = Charset.forName("UTF8").newDecoder();
         decode.onMalformedInput(codingErrorAction);
         decode.onUnmappableCharacter(codingErrorAction);
@@ -75,7 +73,7 @@ public class Charsetfunctions {
             s = decode.decode(bytes).toString();
             bytes.reset();
         } catch (CharacterCodingException e) {
-            throw new InvalidDataException(CloseFrame.NO_UTF8, e);
+            throw new RuntimeException(e);
         }
         return s;
     }

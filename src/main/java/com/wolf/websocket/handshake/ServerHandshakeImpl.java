@@ -1,28 +1,24 @@
 package com.wolf.websocket.handshake;
 
-public class ServerHandshakeImpl extends HandshakedataImpl implements ServerHandshake {
+/**
+ *
+ * @author aladdin
+ */
+public class ServerHandshakeImpl extends AbstractHandshake implements ServerHandshake {
 
-    private short httpstatus;
-    private String httpstatusmessage;
+    private final int state;
+    private final String message;
 
-    public ServerHandshakeImpl() {
+    public ServerHandshakeImpl(int state, String message) {
+        this.state = state;
+        this.message = message;
     }
 
-    @Override
-    public String getHttpStatusMessage() {
-        return httpstatusmessage;
+    public int getHttpState() {
+        return this.state;
     }
 
-    @Override
-    public short getHttpStatus() {
-        return httpstatus;
-    }
-
-    public void setHttpStatusMessage(String message) {
-        this.httpstatusmessage = message;
-    }
-
-    public void setHttpStatus(short status) {
-        httpstatus = status;
+    public String getHttpMessage() {
+        return this.message;
     }
 }

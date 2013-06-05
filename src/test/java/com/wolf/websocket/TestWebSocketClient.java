@@ -1,33 +1,35 @@
 package com.wolf.websocket;
 
-import com.wolf.websocket.client.WebSocketClient;
-import com.wolf.websocket.logger.Log;
-import java.net.URI;
-
 /**
  *
  * @author aladdin
  */
-public class TestWebSocketClient extends WebSocketClient {
+public class TestWebSocketClient {
 
-    public TestWebSocketClient(URI serverUri) {
-        super(serverUri);
+    private final WebSocket webSocket;
+    private final WebSocketListener listener = new WebSocketListener() {
+        public void onMessage(String message) {
+            System.out.println(message);
+        }
+
+        public void onClose() {
+            System.out.println("socket close");
+        }
+
+        public void onError(Exception ex) {
+        }
+    };
+
+    public TestWebSocketClient(String url) {
+        this.webSocket = new WebSocketImpl(this.listener, url);
+        this.webSocket.start();
     }
-
-    @Override
-    public void onOpen() {
-        Log.LOG.debug("TestWebSocketClient: on open");
+    
+    public void send(String message) {
+        this.webSocket.send(message);
     }
-
-    @Override
-    public void onMessage(String message) {
-    }
-
-    @Override
-    public void onError(Exception ex) {
-    }
-
-    public void onClose() {
-        Log.LOG.debug("TestWebSocketClient: on close");
+    
+    public void login(String userName, String password) {
+        this.webSocket.send("{\"act\":\"LOGIN\"}");
     }
 }
