@@ -4,9 +4,8 @@ package com.wolf.websocket;
  *
  * @author aladdin
  */
-public enum ReadyStateEnum {
+public enum ReadyState {
 
-    NOT_YET_CONNECTED,
     CONNECTING,
     OPEN,
     CLOSING,

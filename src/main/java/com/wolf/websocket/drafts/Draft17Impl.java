@@ -92,12 +92,11 @@ public class Draft17Impl implements Draft {
         return byteBuffer;
     }
 
-    private List<String> readStringLine(ByteBuffer buf) {
-        List<String> lineList = new ArrayList<String>(10);
+    private String readStringLine(ByteBuffer buf) {
         ByteBuffer subBuf = ByteBuffer.allocate(buf.remaining());
         byte prev;
         byte cur = 0;
-        String line;
+        String line = null;
         while (buf.hasRemaining()) {
             prev = cur;
             cur = buf.get();
@@ -107,32 +106,33 @@ public class Draft17Impl implements Draft {
                 subBuf.position(0);
                 if (subBuf.limit() > 0) {
                     line = Charsetfunctions.stringAscii(subBuf.array(), 0, subBuf.limit());
-                    lineList.add(line);
                 }
-                subBuf.clear();
+                break;
             }
         }
-        return lineList;
+        return line;
     }
 
     @Override
     public ServerHandshake parseServerHandshake(ByteBuffer byteBuffer) {
-        ServerHandshakeImpl serverHandshake = null;
-        List<String> lineList = this.readStringLine(byteBuffer);
-        String firstLine = lineList.get(0);
-        String[] firstLineTokens = firstLine.split(" ", 3);
-        if (firstLineTokens.length == 3) {
-            int httpState = Integer.parseInt(firstLineTokens[1]);
-            String httpMessage = firstLineTokens[2];
-            serverHandshake = new ServerHandshakeImpl(httpState, httpMessage);
-            String line;
-            String[] fieldTokens;
-            for (int index = 1; index < lineList.size(); index++) {
-                line = lineList.get(index);
-                fieldTokens = line.split(":");
-                if (fieldTokens.length == 2) {
-                    serverHandshake.putHttpFiled(fieldTokens[0], fieldTokens[1].trim());
+        ServerHandshake serverHandshake = null;
+        String firstLine = this.readStringLine(byteBuffer);
+        if (firstLine != null) {
+            String[] firstLineTokens = firstLine.split(" ", 3);
+            if (firstLineTokens.length == 3) {
+                int httpState = Integer.parseInt(firstLineTokens[1]);
+                String httpMessage = firstLineTokens[2];
+                ServerHandshakeImpl serverHandshakeImpl = new ServerHandshakeImpl(httpState, httpMessage);
+                String line = this.readStringLine(byteBuffer);
+                String[] fieldTokens;
+                while (line != null && line.length() > 0) {
+                    fieldTokens = line.split(":");
+                    if (fieldTokens.length == 2) {
+                        serverHandshakeImpl.putHttpFiled(fieldTokens[0], fieldTokens[1].trim());
+                    }
+                    line = this.readStringLine(byteBuffer);
                 }
+                serverHandshake = serverHandshakeImpl;
             }
         }
         return serverHandshake;

@@ -1,7 +1,5 @@
 package com.wolf.websocket;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -36,14 +34,22 @@ public class WebSocketJUnitTest {
 
     @Test
     public void hello() {
-        TestWebSocketClient client = new TestWebSocketClient("ws://192.168.64.50:8080/test-server/socket.io");
-        client.login("", "");
+        WebSocketClient client = new AbstractWebSocketClient("ws://192.168.64.50:8080/test-server/socket.io") {
+            public void onMessage(String message) {
+                System.out.println(Thread.currentThread().getName() + " " + message);
+            }
+
+            public void onError(Exception ex) {
+                ex.printStackTrace();
+            }
+        };
+        client.send("{\"act\":\"LOGIN\"}");
         int i = 0;
         while (i < 1000) {
-            System.out.println(i + "---------------------------");
             client.send("{\"act\":\"GET_TIME\",\"num\":\"" + i + "\"}");
             i++;
         }
+
         try {
             Thread.sleep(500000);
         } catch (InterruptedException ex) {
