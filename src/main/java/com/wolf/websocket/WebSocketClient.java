@@ -7,4 +7,6 @@ package com.wolf.websocket;
 public interface WebSocketClient extends WebSocketClientListener{
     
     public void send(String message);
+    
+    public void close();
 }

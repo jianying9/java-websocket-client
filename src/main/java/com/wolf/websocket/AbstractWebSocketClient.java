@@ -32,6 +32,13 @@ public abstract class AbstractWebSocketClient implements WebSocketClient {
             this.onError(ex);
         }
     }
+    
+    @Override
+    public void close() {
+        if(this.sendThread != null && this.sendThread.isAlive()) {
+            this.sendThread.interrupt();
+        }
+    }
 
     private final class WebSocketSendThread implements Runnable {
 
@@ -48,19 +55,12 @@ public abstract class AbstractWebSocketClient implements WebSocketClient {
             try {
                 while (Thread.interrupted() == false) {
                     message = sendMessageQueue.take();
-                    System.out.println(Thread.currentThread().getName() + " ready send:" + message);
-                    if (this.webSocket == null) {
-                        System.out.println(Thread.currentThread().getName() + " one check web socket null......");
-                    }
                     if (this.webSocket != null && this.webSocket.isOpen()) {
-                        System.out.println(Thread.currentThread().getName() + " send:" + message);
                         this.webSocket.send(message);
                     } else {
-                        System.out.println(Thread.currentThread().getName() + " connect......" + message);
                         this.webSocket = new AbstractWebSocket(serverUrl, message) {
                             @Override
                             public void onOpen() {
-                                System.out.println(Thread.currentThread().getName() + " connect success!!!");
                             }
 
                             @Override
@@ -70,7 +70,6 @@ public abstract class AbstractWebSocketClient implements WebSocketClient {
 
                             @Override
                             public void onClose() {
-                                System.out.println(Thread.currentThread().getName() + " closing");
                                 webSocket = null;
                             }
 
@@ -80,14 +79,14 @@ public abstract class AbstractWebSocketClient implements WebSocketClient {
                             }
                         };
                         this.webSocket.connect();
-                        if (this.webSocket == null) {
-                            System.out.println(Thread.currentThread().getName() + " two check web socket null......");
-                        }
                     }
                 }
             } catch (InterruptedException e) {
                 this.webSocket.onError(e);
             } finally {
+                if(this.webSocket != null && this.webSocket.isOpen()) {
+                    this.webSocket.close();
+                }
                 sendThread = null;
             }
         }

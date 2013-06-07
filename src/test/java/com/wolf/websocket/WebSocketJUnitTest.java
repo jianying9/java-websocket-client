@@ -49,7 +49,7 @@ public class WebSocketJUnitTest {
             client.send("{\"act\":\"GET_TIME\",\"num\":\"" + i + "\"}");
             i++;
         }
-
+//        client.close();
         try {
             Thread.sleep(500000);
         } catch (InterruptedException ex) {
